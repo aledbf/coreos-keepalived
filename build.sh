@@ -3,43 +3,46 @@
 # fail on any command exiting non-zero
 set -eo pipefail
 
-VERSION_OPENSSL=openssl-1.0.1j
-VERSION_KEEPALIVED=1.2.13
+# download openssl
+wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/openssl_1.0.1e.orig.tar.gz
+wget http://security.debian.org/debian-security/pool/updates/main/o/openssl/openssl_1.0.1e-2+deb7u13.debian.tar.gz
 
-SOURCE_KEEPALIVED=https://github.com/acassen/keepalived/archive/v
-SOURCE_OPENSSL=https://www.openssl.org/source/
+# extract
+tar xf openssl_1.0.1e.orig.tar.gz
+cd openssl-1.0.1e/
+tar xf ../openssl_1.0.1e-2+deb7u13.debian.tar.gz
 
-apt-get -y install curl wget build-essential
+# disable features
+sed -i 's/no-rc5 zlib/no-rc5 no-zlib/' debian/rules
+sed -i 's/no-shared/no-shared no-ssl2 no-ssl3 no-zlib-dynamic/' debian/rules
 
-rm -rf build && mkdir build
+# build, this will take a while
+DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -us -uc
+
+# extract the deb packages to a directory
+cd ..
+
+mkdir patched-openssl
+
+cd patched-openssl
+
+for datfile in ../*.deb; do
+  7z -y x "$datfile"
+  tar xf data.tar
+done
+
+SOURCE_KEEPALIVED=https://github.com/acassen/keepalived/archive/v1.2.13.tar.gz
 
 # grab the source files
-wget -P ./build $SOURCE_KEEPALIVED$VERSION_KEEPALIVED.tar.gz --no-check-certificate
-wget -P ./build $SOURCE_OPENSSL$VERSION_OPENSSL.tar.gz --no-check-certificate
+wget -P . $SOURCE_KEEPALIVED --no-check-certificate
 
-# expand the source files
-cd build
+tar xzf v1.2.13.tar.gz
 
-tar xzf $VERSION_OPENSSL.tar.gz
-tar xzf v$VERSION_KEEPALIVED.tar.gz
+cd keepalived-1.2.13
 
-cd ../
+CFLAGS="-I/tmp/patched-openssl/usr/include" LDFLAGS="-L/tmp/patched-openssl/usr/lib -lssl -lz -ldl" ./configure
 
-BUILD_PATH=/tmp/build
-STATICLIBSSL="$BUILD_PATH/staticlibssl"
-
-cd $BUILD_PATH/$VERSION_OPENSSL
-rm -rf "$STATICLIBSSL"
-mkdir "$STATICLIBSSL"
-make clean
-./config --prefix=$STATICLIBSSL no-shared \
-&& make depend \
-&& make \
-&& make install_sw
-
-cd $BUILD_PATH/keepalived-$VERSION_KEEPALIVED
-
-CFLAGS="-I $STATICLIBSSL/include -I/usr/include" LDFLAGS="-L $STATICLIBSSL/lib -Wl,-rpath -lssl -lcrypto -ldl -lz" \
-  ./configure && make
+make SHARED=0 CC='gcc -static'
 
 cp bin/* /tmp
+

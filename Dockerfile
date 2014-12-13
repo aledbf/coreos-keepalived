@@ -1,8 +1,8 @@
 FROM gcc:4.9
 
-WORKDIR /tmp
+RUN apt-get update && apt-get install -y curl wget build-essential debhelper bc p7zip-full
 
-RUN apt-get update && apt-get install curl
+WORKDIR /tmp
 
 COPY build.sh /tmp/build.sh
 
