@@ -1,3 +1,7 @@
+# Deprecated
+
+## working version (in Kubernetes) [kube-keepalived-vip](https://github.com/aledbf/kube-keepalived-vip)
+
 coreos-keepalived
 =================
 
